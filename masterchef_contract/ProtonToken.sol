@@ -24,6 +24,9 @@ contract ProtonToken is ProtofiERC20 {
 
     // Addresses that excluded from antiWhale
     mapping(address => bool) private _excludedFromAntiWhale;
+    // Addresses that excluded from transfer fee
+    mapping(address => bool) private _excludedFromTransferFee;
+
     // Max transfer amount rate in basis points. Eg: 50 - 0.5% of total supply (default the anti whale feature is turned off - set to 10000.)
     uint16 public maxTransferAmountRate = 10000;
     // Minimum transfer amount rate in basis points. Deserved for user trust, we can't block users to send this token.
@@ -107,6 +110,21 @@ contract ProtonToken is ProtofiERC20 {
         _excludedFromAntiWhale[_account] = _excluded;
     }
 
+    /**
+     * @dev Returns the address is excluded from transfer fee or not.
+     */
+    function isExcludedFromTransferFee(address _account) public view returns (bool) {
+        return _excludedFromTransferFee[_account];
+    }
+
+    /**
+     * @dev Exclude or include an address from transfer fee.
+     * Can only be called by the current operator.
+     */
+    function setExcludedFromTransferFee(address _account, bool _excluded) public onlyOperator {
+        _excludedFromTransferFee[_account] = _excluded;
+    }
+
     /// @dev Throws if called by any account other than the owner or the secondary token
     modifier onlyOwnerOrElectron() {
         require(isOwner() || isElectron(), "caller is not the owner or electron");
@@ -145,6 +163,9 @@ contract ProtonToken is ProtofiERC20 {
         if (recipient == BURN_ADDRESS) {
             // Burn all the amount
             super._burn(sender, amount);
+        } else if (_excludedFromTransferFee[sender] || _excludedFromTransferFee[recipient]){
+            // Transfer all the amount
+            super._transfer(sender, recipient, amount);
         } else {
             // 1.8% of every transfer burnt
             uint256 burnAmount = amount.mul(18).div(1000);
